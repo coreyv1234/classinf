@@ -1,32 +1,48 @@
-# Prerequisites
-*.d
+//Corey Vick Jr.
+//10.19.20
+//classifying what grade students are in based from their credit hours completed
+#include <iostream>
+#include <fstream>
+#include <string>
+using namespace std;
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
+int main()
+{
 
-# Precompiled Headers
-*.gch
-*.pch
+  ofstream outData;
 
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
+  //prompt and read in student name 
+  int creditHours, studentID;
+  string name, classification, studentId;
+  cout << "Please enter students name: "<< endl;
+  getline(cin, name);
+  cout << "Please enter student ID #: ";
+  cin >> studentId;
+  cout << "Enter the number of credit hours the student has completed: ";
+  cin >> creditHours;
 
-# Fortran module files
-*.mod
-*.smod
+  //declare
+  if (creditHours < 30)
+  {
+  classification = "The student is a freshman. ";
+  }
+  else if (creditHours >= 30 && creditHours < 60 )
+  {
+  classification = "The student is a sophomore.";
+  }
+  else if (creditHours >= 60 && creditHours < 90)
+  {
+  classification = "The student is a junior";
+  }
+  else 
+  {
+  classification = "This student is a senior";
+  }
 
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
+  //send information to transcript file
+  outData.open("transcript.txt");
+  outData << "Name: " << name << endl<< "StudentId: " << studentId << endl << "Credit Hours: " << creditHours << endl << "Student Classification: " << classification;
+  outData.close();
+  
+  return 0;
+}
