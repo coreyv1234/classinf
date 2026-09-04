@@ -27,7 +27,7 @@ jobs:
         run: pip install --disable-pip-version-check pandas numpy
       - name: Clone public MGC dataset
         run: git clone --depth 1 https://github.com/domzack/mgc-ohlcv-data.git mgc-source
-      - name: Run pre-2025 diagnostics
+      - name: Run fixed pre-2025 diagnostics
         run: python mgc_research/stable_family_diagnostics.py
       - name: Commit results to research branch
         run: |
