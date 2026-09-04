@@ -27,18 +27,18 @@ jobs:
         run: pip install --disable-pip-version-check pandas numpy
       - name: Clone public MGC dataset
         run: git clone --depth 1 https://github.com/domzack/mgc-ohlcv-data.git mgc-source
-      - name: Run fixed pre-2025 diagnostics
+      - name: Rank pre-2025 stable families
         run: python mgc_research/stable_family_diagnostics.py
       - name: Commit results to research branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add mgc_research/stable_results/
-          git commit -m "Add pre-2025 stable-family diagnostics [skip ci]" || true
+          git commit -m "Rank pre-2025 stable families [skip ci]" || true
           git push origin HEAD:mgc-v11-research
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
-          name: mgc-v11-pre2025-diagnostics
+          name: mgc-v11-pre2025-ranked-families
           path: mgc_research/stable_results/
           retention-days: 30
