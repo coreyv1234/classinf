@@ -1,8 +1,9 @@
 from __future__ import annotations
-import json
+import json, sys
 from pathlib import Path
 import pandas as pd
-import mgc_research.stable_family_research as s
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+import stable_family_research as s
 
 OUT=Path('mgc_research/stable_results'); OUT.mkdir(parents=True,exist_ok=True)
 
@@ -24,7 +25,6 @@ def main():
             sel=s.select_families(fs,tier)
             for slots in [1,2]:
                 m23=s.metrics(s.simulate(t[t.year==2023],sel,slots)); m24=s.metrics(s.simulate(t[t.year==2024],sel,slots))
-                # Diagnostic ranking uses 2023-2024 only and intentionally does not inspect 2025 or 2026.
                 if m23.get('trades',0) and m24.get('trades',0):
                     sc=min(m23.get('avg_day_R',-9),m24.get('avg_day_R',-9))+.25*min(m23.get('PF',0),m24.get('PF',0),3)+.003*min(m23.get('green_pct',0),m24.get('green_pct',0))
                 else: sc=-999
