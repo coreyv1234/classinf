@@ -1,0 +1,282 @@
+{
+  "bars": 221664,
+  "events": 30150,
+  "top_pre2025": [
+    {
+      "profile": "P075_R175",
+      "stop_mult": 0.75,
+      "rr": 1.75,
+      "tier": "STRICT",
+      "slots": 1,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P075_R175",
+      "stop_mult": 0.75,
+      "rr": 1.75,
+      "tier": "STRICT",
+      "slots": 2,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P075_R175",
+      "stop_mult": 0.75,
+      "rr": 1.75,
+      "tier": "BALANCED",
+      "slots": 1,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P075_R175",
+      "stop_mult": 0.75,
+      "rr": 1.75,
+      "tier": "BALANCED",
+      "slots": 2,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P075_R225",
+      "stop_mult": 0.75,
+      "rr": 2.25,
+      "tier": "STRICT",
+      "slots": 1,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P075_R225",
+      "stop_mult": 0.75,
+      "rr": 2.25,
+      "tier": "STRICT",
+      "slots": 2,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P075_R225",
+      "stop_mult": 0.75,
+      "rr": 2.25,
+      "tier": "BALANCED",
+      "slots": 1,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P075_R225",
+      "stop_mult": 0.75,
+      "rr": 2.25,
+      "tier": "BALANCED",
+      "slots": 2,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P075_R275",
+      "stop_mult": 0.75,
+      "rr": 2.75,
+      "tier": "STRICT",
+      "slots": 1,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P075_R275",
+      "stop_mult": 0.75,
+      "rr": 2.75,
+      "tier": "STRICT",
+      "slots": 2,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P075_R275",
+      "stop_mult": 0.75,
+      "rr": 2.75,
+      "tier": "BALANCED",
+      "slots": 1,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P075_R275",
+      "stop_mult": 0.75,
+      "rr": 2.75,
+      "tier": "BALANCED",
+      "slots": 2,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P090_R175",
+      "stop_mult": 0.9,
+      "rr": 1.75,
+      "tier": "STRICT",
+      "slots": 1,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P090_R175",
+      "stop_mult": 0.9,
+      "rr": 1.75,
+      "tier": "STRICT",
+      "slots": 2,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P090_R175",
+      "stop_mult": 0.9,
+      "rr": 1.75,
+      "tier": "BALANCED",
+      "slots": 1,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P090_R175",
+      "stop_mult": 0.9,
+      "rr": 1.75,
+      "tier": "BALANCED",
+      "slots": 2,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P090_R225",
+      "stop_mult": 0.9,
+      "rr": 2.25,
+      "tier": "STRICT",
+      "slots": 1,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P090_R225",
+      "stop_mult": 0.9,
+      "rr": 2.25,
+      "tier": "STRICT",
+      "slots": 2,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P090_R225",
+      "stop_mult": 0.9,
+      "rr": 2.25,
+      "tier": "BALANCED",
+      "slots": 1,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P090_R225",
+      "stop_mult": 0.9,
+      "rr": 2.25,
+      "tier": "BALANCED",
+      "slots": 2,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P090_R275",
+      "stop_mult": 0.9,
+      "rr": 2.75,
+      "tier": "STRICT",
+      "slots": 1,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P090_R275",
+      "stop_mult": 0.9,
+      "rr": 2.75,
+      "tier": "STRICT",
+      "slots": 2,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P090_R275",
+      "stop_mult": 0.9,
+      "rr": 2.75,
+      "tier": "BALANCED",
+      "slots": 1,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P090_R275",
+      "stop_mult": 0.9,
+      "rr": 2.75,
+      "tier": "BALANCED",
+      "slots": 2,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    },
+    {
+      "profile": "P105_R175",
+      "stop_mult": 1.05,
+      "rr": 1.75,
+      "tier": "STRICT",
+      "slots": 1,
+      "families": 0,
+      "diag_score": -999,
+      "y2023_trades": 0,
+      "y2024_trades": 0
+    }
+  ],
+  "note": "Diagnostics use 2023-2024 only. 2025 and 2026 are deliberately not read here."
+}
