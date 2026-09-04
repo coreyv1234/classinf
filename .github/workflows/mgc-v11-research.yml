@@ -1,0 +1,37 @@
+name: MGC V11 Multi-Year Research
+
+on:
+  push:
+    branches: [mgc-v11-research]
+  workflow_dispatch:
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout research repo
+        uses: actions/checkout@v4
+        with:
+          ref: mgc-v11-research
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install --disable-pip-version-check pandas numpy scikit-learn pyarrow
+
+      - name: Clone public MGC dataset
+        run: git clone --depth 1 https://github.com/domzack/mgc-ohlcv-data.git mgc-source
+
+      - name: Run deep research
+        run: python mgc_research/deep_mgc_research.py
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: mgc-v11-multiyear-results
+          path: mgc_research/results/
+          retention-days: 30
