@@ -1,4 +1,4 @@
-name: MGC V11 Multi-Year Research
+name: MGC V12 Multi-Year ML Research
 
 on:
   push:
@@ -24,21 +24,21 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies
-        run: pip install --disable-pip-version-check pandas numpy
+        run: pip install --disable-pip-version-check pandas numpy scikit-learn
       - name: Clone public MGC dataset
         run: git clone --depth 1 https://github.com/domzack/mgc-ohlcv-data.git mgc-source
-      - name: Rank pre-2025 stable families
-        run: python mgc_research/stable_family_diagnostics.py
+      - name: Run V12 multi-year ML router research
+        run: python mgc_research/v12_ml_router.py
       - name: Commit results to research branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add mgc_research/stable_results/
-          git commit -m "Rank pre-2025 stable families [skip ci]" || true
+          git add mgc_research/v12_results/
+          git commit -m "Add V12 multi-year ML holdout results [skip ci]" || true
           git push origin HEAD:mgc-v11-research
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
-          name: mgc-v11-pre2025-ranked-families
-          path: mgc_research/stable_results/
+          name: mgc-v12-multiyear-results
+          path: mgc_research/v12_results/
           retention-days: 30
