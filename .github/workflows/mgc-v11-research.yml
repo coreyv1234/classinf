@@ -12,39 +12,33 @@ permissions:
 jobs:
   research:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
       - name: Checkout research branch
         uses: actions/checkout@v4
         with:
           ref: mgc-v11-research
           fetch-depth: 0
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
       - name: Install dependencies
         run: pip install --disable-pip-version-check pandas numpy
-
       - name: Clone public MGC dataset
         run: git clone --depth 1 https://github.com/domzack/mgc-ohlcv-data.git mgc-source
-
-      - name: Run optimized stable-family research
-        run: python mgc_research/stable_family_research.py
-
+      - name: Run pre-2025 diagnostics
+        run: python mgc_research/stable_family_diagnostics.py
       - name: Commit results to research branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add mgc_research/stable_results/
-          git commit -m "Add optimized multi-year stable-family results [skip ci]" || true
+          git commit -m "Add pre-2025 stable-family diagnostics [skip ci]" || true
           git push origin HEAD:mgc-v11-research
-
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
-          name: mgc-v11-stable-family-results
+          name: mgc-v11-pre2025-diagnostics
           path: mgc_research/stable_results/
           retention-days: 30
