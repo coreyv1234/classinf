@@ -1,0 +1,138 @@
+name: MNQ Displacement Multi-Year Validation
+
+on:
+  push:
+    branches:
+      - mnq-displacement-multiyear-20260907
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install --disable-pip-version-check numpy pandas
+      - name: Restore frozen V2/V3 engine
+        run: |
+          gunzip -c scratch/mnq_v42/SOVEREIGN_MNQ_V2_NO_PD_RESEARCH.py.gz > SOVEREIGN_MNQ_V2_NO_PD_RESEARCH.py
+          gunzip -c scratch/mnq_v42/SOVEREIGN_MNQ_V3_BIG_R_GRADED_RESEARCH.py.gz > SOVEREIGN_MNQ_V3_BIG_R_GRADED_RESEARCH.py
+      - name: Sparse checkout public MNQ Last-trade minute files
+        run: |
+          git clone --filter=blob:none --no-checkout --depth 1 https://github.com/mbytes21/MNQ_DATA.git MNQ_DATA
+          cd MNQ_DATA
+          git sparse-checkout init --no-cone
+          git sparse-checkout set --no-cone 'plaintext_csv/*/*.Last.csv'
+          git checkout main
+          echo "Last files:" $(find plaintext_csv -name '*.Last.csv' | wc -l)
+          du -sh plaintext_csv
+      - name: Build causal continuous MNQ 5-minute history
+        run: |
+          python scratch/mnq_v42/stitch_mnq_multiyear.py MNQ_DATA --start '2019-12-01' --end '2025-12-31 23:59:59' --out MNQ_STITCHED | tee stitch_stdout.txt
+          head -5 MNQ_STITCHED/selected_contract_by_day.csv
+          tail -5 MNQ_STITCHED/selected_contract_by_day.csv
+      - name: Run frozen V3 engine over 2019-2025 history
+        run: |
+          python SOVEREIGN_MNQ_V3_BIG_R_GRADED_RESEARCH.py MNQ_STITCHED/MNQ_5m_2019_2025.csv --source-tz UTC --input-minutes 5 --out MNQ_V3_MULTIYEAR | tee v3_multiyear_stdout.txt
+      - name: Grade frozen Displacement Pullback and all families by year
+        run: |
+          python - <<'PY' | tee displacement_multiyear_analysis.txt
+          import json
+          from pathlib import Path
+          import numpy as np
+          import pandas as pd
+
+          START_BAL=48653.0
+          FLOOR=48000.0
+          TARGETS=[48800,49200,49600,50000,51000,52000,53000]
+          t=pd.read_csv('MNQ_V3_MULTIYEAR/trades.csv')
+          t['session_date']=pd.to_datetime(t['session_date'])
+          t['year']=t['session_date'].dt.year
+
+          def stats(g):
+              if len(g)==0:
+                  return dict(trades=0,wins=0,wr=0,net=0,pf=0,dd=0,active_days=0,best=0,worst=0)
+              x=g['net_1mnq'].astype(float)
+              wins=int((x>0).sum())
+              gp=float(x[x>0].sum()); gl=float(-x[x<0].sum())
+              eq=x.cumsum(); dd=float((eq.cummax()-eq).max()) if len(eq) else 0.0
+              return dict(
+                  trades=int(len(g)), wins=wins, wr=100*wins/len(g), net=float(x.sum()),
+                  pf=(gp/gl if gl>0 else float('inf')), dd=dd,
+                  active_days=int(g['session_date'].dt.date.nunique()),
+                  best=float(x.max()), worst=float(x.min()))
+
+          print('=== DATA COVERAGE ===')
+          print(Path('MNQ_STITCHED/coverage.json').read_text())
+          print('=== ALL FAMILIES BY YEAR, 1 MNQ ===')
+          rows=[]
+          for (yr,fam),g in t[t.year.between(2020,2025)].groupby(['year','family']):
+              s=stats(g); rows.append({'year':yr,'family':fam,**s})
+          allfam=pd.DataFrame(rows).sort_values(['family','year'])
+          print(allfam.to_string(index=False, float_format=lambda v:f'{v:.2f}'))
+          allfam.to_csv('MNQ_V3_MULTIYEAR/family_year_stats.csv',index=False)
+
+          d=t[(t['family']=='DISPLACEMENT_PULLBACK') & t.year.between(2020,2025)].copy()
+          print('\n=== DISPLACEMENT PULLBACK FROZEN MULTI-YEAR ===')
+          drows=[]
+          for yr in range(2020,2026):
+              g=d[d.year==yr].copy()
+              s=stats(g)
+              if len(g):
+                  bal=START_BAL+g['net_1mnq'].astype(float).cumsum()
+                  min_bal=float(bal.min()); end_bal=float(bal.iloc[-1])
+                  min_cush=min_bal-FLOOR
+                  breached=bool((bal<=FLOOR).any())
+                  hits={str(level):(str(g.loc[bal>=level,'session_date'].iloc[0].date()) if (bal>=level).any() else 'NEVER') for level in TARGETS}
+              else:
+                  min_bal=end_bal=START_BAL; min_cush=START_BAL-FLOOR; breached=False; hits={str(level):'NEVER' for level in TARGETS}
+              row={'year':yr,**s,'start_balance':START_BAL,'end_balance':end_bal,'min_balance':min_bal,'min_cushion':min_cush,'floor_breached':breached,**{f'hit_{k}':v for k,v in hits.items()}}
+              drows.append(row)
+          dy=pd.DataFrame(drows)
+          print(dy.to_string(index=False, float_format=lambda v:f'{v:.2f}'))
+          dy.to_csv('MNQ_V3_MULTIYEAR/displacement_year_stats.csv',index=False)
+
+          overall=stats(d)
+          print('\n=== DISPLACEMENT OVERALL 2020-2025 ===')
+          print(json.dumps(overall,indent=2))
+          if len(d):
+              print('long_short:')
+              for side,g in d.groupby('direction'):
+                  print(side, stats(g))
+              years_positive=sum(dy['net']>0)
+              years_pf_gt_1=sum(dy['pf']>1)
+              years_pf_gt_1_25=sum(dy['pf']>1.25)
+              print('positive_years',int(years_positive),'of',len(dy))
+              print('pf_gt_1_years',int(years_pf_gt_1),'of',len(dy))
+              print('pf_gt_1_25_years',int(years_pf_gt_1_25),'of',len(dy))
+              print('floor_breach_years',int(dy['floor_breached'].sum()),'of',len(dy))
+              # Prespecified robustness gate. No tuning is performed here.
+              pass_gate=(years_positive>=5 and years_pf_gt_1_25>=4 and overall['pf']>=1.35 and overall['dd']<=650 and not dy['floor_breached'].any() and overall['trades']>=60)
+              print('ROBUSTNESS_GATE', 'PASS' if pass_gate else 'FAIL')
+
+          # Portfolio diagnostic only: identify families that are positive in >=5/6 years and PF>1 overall.
+          print('\n=== UNTOUCHED FAMILY ROBUSTNESS SCREEN ===')
+          for fam,g in t[t.year.between(2020,2025)].groupby('family'):
+              sy=[]
+              for yr in range(2020,2026): sy.append(stats(g[g.year==yr]))
+              ov=stats(g)
+              py=sum(s['net']>0 for s in sy); p125=sum(s['pf']>1.25 for s in sy)
+              print(fam,'overall',ov,'positive_years',py,'pf>1.25_years',p125)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mnq-displacement-multiyear-results
+          path: |
+            MNQ_STITCHED/coverage.json
+            MNQ_STITCHED/selected_contract_by_day.csv
+            MNQ_V3_MULTIYEAR/report.json
+            MNQ_V3_MULTIYEAR/trades.csv
+            MNQ_V3_MULTIYEAR/family_year_stats.csv
+            MNQ_V3_MULTIYEAR/displacement_year_stats.csv
+            stitch_stdout.txt
+            v3_multiyear_stdout.txt
+            displacement_multiyear_analysis.txt
