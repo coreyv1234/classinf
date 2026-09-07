@@ -1,0 +1,61 @@
+name: MNQ V3 Full Signal Backtest
+
+on:
+  push:
+    branches:
+      - mnq-v42-full-backtest-20260907
+  workflow_dispatch:
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --disable-pip-version-check numpy pandas
+      - name: Restore frozen V2/V3 scripts
+        run: |
+          gunzip -c scratch/mnq_v42/SOVEREIGN_MNQ_V2_NO_PD_RESEARCH.py.gz > SOVEREIGN_MNQ_V2_NO_PD_RESEARCH.py
+          gunzip -c scratch/mnq_v42/SOVEREIGN_MNQ_V3_BIG_R_GRADED_RESEARCH.py.gz > SOVEREIGN_MNQ_V3_BIG_R_GRADED_RESEARCH.py
+      - name: Download full MNQ data
+        run: curl -fL --retry 3 'https://raw.githubusercontent.com/axb0306/cme-futures-ohlc/main/MNQ/MNQ_5min_20260120_20260415.csv' -o MNQ.csv
+      - name: Run frozen V3 signal engine
+        run: |
+          python SOVEREIGN_MNQ_V3_BIG_R_GRADED_RESEARCH.py MNQ.csv --source-tz UTC --input-minutes 5 --out MNQ_V3_FULL | tee v3_stdout.txt
+      - name: Print signal diagnostics
+        run: |
+          python - <<'PY'
+          import json, pandas as pd
+          r=json.load(open('MNQ_V3_FULL/report.json'))
+          t=pd.read_csv('MNQ_V3_FULL/trades.csv')
+          print('===CORE===')
+          for k in ['bars_5m','candidate_count','trades','win_rate','best_trade_1mnq','best_trade_graded','worst_trade_graded']:
+              print(k,r.get(k))
+          for k in ['normalized_1mnq','fixed_2mnq','fixed_4mnq','fixed_6mnq','graded_sizing']:
+              print(k,r.get(k))
+          print('===BY_FAMILY===')
+          print(json.dumps(r.get('by_family',{}),indent=2))
+          if len(t):
+              print('===BY_DIRECTION===')
+              for side,g in t.groupby('direction'):
+                  gp=g.loc[g.net_1mnq>0,'net_1mnq'].sum(); gl=-g.loc[g.net_1mnq<0,'net_1mnq'].sum()
+                  print(side,'n',len(g),'wr',round((g.net_1mnq>0).mean()*100,2),'net1',round(g.net_1mnq.sum(),2),'pf',round(gp/gl,3) if gl else 'inf')
+              day=t.groupby('session_date').agg(net1=('net_1mnq','sum'),netg=('net_graded','sum'),trades=('net_1mnq','size')).reset_index()
+              print('===DAYS===')
+              print('active_days',len(day),'green1',int((day.net1>0).sum()),'red1',int((day.net1<0).sum()),'avg_active1',round(day.net1.mean(),2),'best1',round(day.net1.max(),2),'worst1',round(day.net1.min(),2))
+              eq=t.net_1mnq.cumsum(); dd=eq-eq.cummax(); print('calc_maxdd_1',round(-dd.min(),2))
+              eqg=t.net_graded.cumsum(); ddg=eqg-eqg.cummax(); print('calc_maxdd_graded',round(-ddg.min(),2))
+              print('first5')
+              print(t.head(5)[['session_date','family','direction','net_1mnq','net_graded']].to_string(index=False))
+              print('last5')
+              print(t.tail(5)[['session_date','family','direction','net_1mnq','net_graded']].to_string(index=False))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mnq-v3-full-signal-results
+          path: |
+            MNQ_V3_FULL/
+            v3_stdout.txt
