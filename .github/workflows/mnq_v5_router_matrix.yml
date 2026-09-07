@@ -1,0 +1,71 @@
+name: MNQ V5 Router Matrix
+
+on:
+  push:
+    branches: [mnq-v5-router-20260907]
+    paths:
+      - 'scratch/mnq_v42/SOVEREIGN_MNQ_V5_ROUTER_RESEARCH.py'
+      - '.github/workflows/mnq_v5_router_matrix.yml'
+
+jobs:
+  validate-year:
+    strategy:
+      fail-fast: false
+      matrix:
+        year: [2020, 2021, 2022, 2023, 2024, 2025]
+    runs-on: ubuntu-latest
+    env:
+      YEAR: ${{ matrix.year }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --disable-pip-version-check numpy pandas
+      - name: Restore frozen V2/V3 engine
+        run: |
+          gunzip -c scratch/mnq_v42/SOVEREIGN_MNQ_V2_NO_PD_RESEARCH.py.gz > SOVEREIGN_MNQ_V2_NO_PD_RESEARCH.py
+          gunzip -c scratch/mnq_v42/SOVEREIGN_MNQ_V3_BIG_R_GRADED_RESEARCH.py.gz > SOVEREIGN_MNQ_V3_BIG_R_GRADED_RESEARCH.py
+          cp scratch/mnq_v42/SOVEREIGN_MNQ_V5_ROUTER_RESEARCH.py .
+      - name: Sparse checkout MNQ minute data
+        run: |
+          git clone --filter=blob:none --no-checkout --depth 1 https://github.com/mbytes21/MNQ_DATA.git MNQ_DATA
+          cd MNQ_DATA
+          git sparse-checkout init --no-cone
+          git sparse-checkout set --no-cone 'plaintext_csv/*/*.Last.csv'
+          git checkout main
+      - name: Build causal target-year history
+        run: |
+          PREV=$((YEAR-1))
+          python scratch/mnq_v42/stitch_mnq_multiyear.py MNQ_DATA --start "$PREV-12-01" --end "$YEAR-12-31 23:59:59" --out STITCH_$YEAR
+      - name: Run frozen V5 router
+        run: |
+          python SOVEREIGN_MNQ_V5_ROUTER_RESEARCH.py STITCH_$YEAR/MNQ_5m_2019_2025.csv --source-tz UTC --input-minutes 5 --out V5_$YEAR >/dev/null
+      - name: Print V5 result
+        run: |
+          python - <<'PY'
+          import json, os, pandas as pd, numpy as np
+          y=int(os.environ['YEAR'])
+          p=f'V5_{y}/trades.csv'
+          g=pd.read_csv(p) if os.path.exists(p) else pd.DataFrame()
+          if len(g):
+              g=g[pd.to_datetime(g['session_date']).dt.year==y].copy()
+              x=g['net_1mnq'].astype(float)
+              gp=float(x[x>0].sum()); gl=float(-x[x<0].sum())
+              pf=gp/gl if gl else (999.0 if gp else 0.0)
+              eq=pd.concat([pd.Series([0.0]),x.cumsum().reset_index(drop=True)],ignore_index=True)
+              dd=float((eq.cummax()-eq).max())
+              net=float(x.sum()); wr=float((x>0).mean()*100)
+          else:
+              net=wr=pf=dd=0.0
+          out={'year':y,'trades':int(len(g)),'wins':int((g['net_1mnq']>0).sum()) if len(g) else 0,'win_rate':wr,'net_1mnq':net,'profit_factor':pf,'max_drawdown_1mnq':dd}
+          print('V5_YEAR_RESULT '+json.dumps(out,sort_keys=True))
+          open(f'v5_{y}_result.json','w').write(json.dumps(out,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mnq-v5-${{ matrix.year }}
+          path: |
+            v5_${{ matrix.year }}_result.json
+            V5_${{ matrix.year }}/trades.csv
+            V5_${{ matrix.year }}/report.json
