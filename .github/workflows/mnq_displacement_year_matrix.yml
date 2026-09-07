@@ -1,0 +1,82 @@
+name: MNQ Displacement Year Matrix
+
+on:
+  push:
+    branches:
+      - mnq-displacement-year-matrix-20260907
+  workflow_dispatch:
+
+jobs:
+  validate-year:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        year: [2020, 2021, 2022, 2023, 2024, 2025]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --disable-pip-version-check numpy pandas
+      - name: Restore frozen engine
+        run: |
+          gunzip -c scratch/mnq_v42/SOVEREIGN_MNQ_V2_NO_PD_RESEARCH.py.gz > SOVEREIGN_MNQ_V2_NO_PD_RESEARCH.py
+          gunzip -c scratch/mnq_v42/SOVEREIGN_MNQ_V3_BIG_R_GRADED_RESEARCH.py.gz > SOVEREIGN_MNQ_V3_BIG_R_GRADED_RESEARCH.py
+      - name: Sparse checkout MNQ Last files
+        run: |
+          git clone --filter=blob:none --no-checkout --depth 1 https://github.com/mbytes21/MNQ_DATA.git MNQ_DATA
+          cd MNQ_DATA
+          git sparse-checkout init --no-cone
+          git sparse-checkout set --no-cone 'plaintext_csv/*/*.Last.csv'
+          git checkout main
+      - name: Build target-year history with warmup
+        env:
+          YEAR: ${{ matrix.year }}
+        run: |
+          PREV=$((YEAR-1))
+          python scratch/mnq_v42/stitch_mnq_multiyear.py MNQ_DATA --start "$PREV-12-01" --end "$YEAR-12-31 23:59:59" --out STITCH_$YEAR
+      - name: Run frozen V3
+        env:
+          YEAR: ${{ matrix.year }}
+        run: |
+          python SOVEREIGN_MNQ_V3_BIG_R_GRADED_RESEARCH.py STITCH_$YEAR/MNQ_5m_2019_2025.csv --source-tz UTC --input-minutes 5 --out V3_$YEAR >/dev/null
+      - name: Print frozen Displacement result
+        env:
+          YEAR: ${{ matrix.year }}
+        run: |
+          python - <<'PY'
+          import json, os, pandas as pd
+          year=int(os.environ['YEAR'])
+          t=pd.read_csv(f'V3_{year}/trades.csv')
+          t['session_date']=pd.to_datetime(t['session_date'])
+          g=t[(t['session_date'].dt.year==year)&(t['family']=='DISPLACEMENT_PULLBACK')].copy()
+          x=g['net_1mnq'].astype(float) if len(g) else pd.Series(dtype=float)
+          wins=int((x>0).sum()); gp=float(x[x>0].sum()); gl=float(-x[x<0].sum())
+          pf=gp/gl if gl else (999.0 if gp else 0.0)
+          eq=x.cumsum(); dd=float((eq.cummax()-eq).max()) if len(eq) else 0.0
+          start=48653.0; floor=48000.0
+          bal=start+eq
+          out={
+            'year':year,'trades':int(len(g)),'wins':wins,'win_rate':(100*wins/len(g) if len(g) else 0.0),
+            'net_1mnq':float(x.sum()),'profit_factor':pf,'max_drawdown_1mnq':dd,
+            'active_days':int(g['session_date'].dt.date.nunique()) if len(g) else 0,
+            'end_balance_from_48653':float(bal.iloc[-1]) if len(bal) else start,
+            'min_balance_from_48653':float(bal.min()) if len(bal) else start,
+            'min_cushion_above_48000':float(bal.min()-floor) if len(bal) else start-floor,
+            'floor_breached':bool((bal<=floor).any()) if len(bal) else False,
+            'long_trades':int((g['direction']=='LONG').sum()) if len(g) else 0,
+            'short_trades':int((g['direction']=='SHORT').sum()) if len(g) else 0,
+          }
+          print('YEAR_RESULT '+json.dumps(out,sort_keys=True))
+          open(f'year_{year}_result.json','w').write(json.dumps(out,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mnq-displacement-${{ matrix.year }}
+          path: |
+            year_${{ matrix.year }}_result.json
+            V3_${{ matrix.year }}/trades.csv
+            STITCH_${{ matrix.year }}/coverage.json
+            STITCH_${{ matrix.year }}/selected_contract_by_day.csv
