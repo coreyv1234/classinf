@@ -60,13 +60,12 @@ def main():
         df = read_one(p)
         if df is None:
             continue
-        total_vol = float(df["volume"].sum())
         meta.append({
-            "date": dt.date().isoformat(),
+            "date": dt,
             "contract": p.parent.name,
             "path": str(p),
             "rows": int(len(df)),
-            "volume": total_vol,
+            "volume": float(df["volume"].sum()),
             "first_ts": str(df["datetime"].min()),
             "last_ts": str(df["datetime"].max()),
         })
@@ -77,10 +76,33 @@ def main():
     if m.empty:
         raise SystemExit("No usable files in requested date range")
     m["contract_key"] = m["contract"].map(contract_sort_key)
-    # Select exactly one contract per calendar date, using total Last-trade volume.
-    # Tie-break toward the later contract to avoid hanging onto an expiring contract.
-    m = m.sort_values(["date", "volume", "contract_key"], ascending=[True, False, False])
-    chosen = m.drop_duplicates("date", keep="first").copy()
+    m = m.sort_values(["contract", "date"])
+
+    # Causal roll choice: today's contract is ranked by that contract's most recent
+    # completed prior-day Last-trade volume. Today's eventual volume is never used.
+    m["prev_volume"] = m.groupby("contract", sort=False)["volume"].shift(1)
+    m["prev_date"] = m.groupby("contract", sort=False)["date"].shift(1)
+    m["prev_age_days"] = (m["date"] - m["prev_date"]).dt.days
+    # Stale prior observations should not decide a roll after long contract inactivity.
+    m.loc[m["prev_age_days"].gt(7), "prev_volume"] = pd.NA
+
+    chosen_rows = []
+    for dt, g in m.groupby("date", sort=True):
+        ranked = g[g["prev_volume"].notna()].copy()
+        if not ranked.empty:
+            ranked = ranked.sort_values(["prev_volume", "contract_key"], ascending=[False, False])
+            row = ranked.iloc[0].copy()
+            row["selection_basis"] = "prior_completed_contract_day_volume"
+        else:
+            # Initial warmup only: no prior completed volume exists. Prefer the nearest
+            # listed expiry (earliest contract_key) rather than looking at today's volume.
+            ranked = g.sort_values(["contract_key"], ascending=[True])
+            row = ranked.iloc[0].copy()
+            row["selection_basis"] = "no_prior_volume_nearest_expiry_fallback"
+        chosen_rows.append(row)
+
+    chosen = pd.DataFrame(chosen_rows).sort_values("date").copy()
+    chosen["date"] = chosen["date"].dt.date.astype(str)
     chosen.to_csv(out / "selected_contract_by_day.csv", index=False)
 
     frames = []
@@ -96,13 +118,11 @@ def main():
     x = pd.concat(frames, ignore_index=True)
     x = x[(x["datetime"] >= start) & (x["datetime"] <= end)].copy()
     x = x.sort_values("datetime")
-    # One selected contract per date means duplicate timestamps should be rare; fail visibly if they exist.
     dupes = int(x["datetime"].duplicated().sum())
     if dupes:
         print("WARNING duplicate timestamps", dupes)
         x = x.drop_duplicates("datetime", keep="last")
 
-    # Source files appear in UTC-like exchange timestamps; preserve naive timestamps and tell the runner UTC.
     x = x.set_index("datetime")
     bars = x.resample("5min", origin="start_day", label="left", closed="left").agg(
         open=("open", "first"),
@@ -124,7 +144,7 @@ def main():
         "first_5m": str(bars["datetime"].min()),
         "last_5m": str(bars["datetime"].max()),
         "duplicate_minutes_removed": dupes,
-        "selection_rule": "highest total Last-trade volume per calendar date; later contract wins ties",
+        "selection_rule": "today uses each contract's most recent completed prior-day total Last-trade volume; stale >7d ignored; no-prior fallback uses nearest expiry",
         "source_repo": "mbytes21/MNQ_DATA",
     }
     (out / "coverage.json").write_text(json.dumps(coverage, indent=2))
