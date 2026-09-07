@@ -1,0 +1,80 @@
+name: MNQ V4.2 Full Backtest
+
+on:
+  push:
+    branches:
+      - mnq-v42-full-backtest-20260907
+  workflow_dispatch:
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install --disable-pip-version-check numpy pandas
+      - name: Restore frozen research scripts
+        run: |
+          gunzip -c scratch/mnq_v42/SOVEREIGN_MNQ_V2_NO_PD_RESEARCH.py.gz > SOVEREIGN_MNQ_V2_NO_PD_RESEARCH.py
+          gunzip -c scratch/mnq_v42/SOVEREIGN_MNQ_V3_BIG_R_GRADED_RESEARCH.py.gz > SOVEREIGN_MNQ_V3_BIG_R_GRADED_RESEARCH.py
+          gunzip -c scratch/mnq_v42/SOVEREIGN_MNQ_V4_2_CLIFF_GUARD_RESEARCH.py.gz > SOVEREIGN_MNQ_V4_2_CLIFF_GUARD_RESEARCH.py
+      - name: Download full public MNQ 5-minute dataset
+        run: |
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://raw.githubusercontent.com/axb0306/cme-futures-ohlc/main/MNQ/MNQ_5min_20260120_20260415.csv' \
+            -o MNQ_5min_20260120_20260415.csv
+          wc -l MNQ_5min_20260120_20260415.csv
+          head -2 MNQ_5min_20260120_20260415.csv
+          tail -2 MNQ_5min_20260120_20260415.csv
+      - name: Run frozen V4.2 from 48653 with modeled 48000 floor
+        run: |
+          python SOVEREIGN_MNQ_V4_2_CLIFF_GUARD_RESEARCH.py \
+            MNQ_5min_20260120_20260415.csv \
+            --source-tz UTC \
+            --input-minutes 5 \
+            --starting-balance 48653 \
+            --drawdown-floor 48000 \
+            --drawdown-amount 2000 \
+            --out MNQ_V42_FULL_2026 | tee v42_stdout.txt
+      - name: Print compact analysis
+        run: |
+          python - <<'PY'
+          import json, pandas as pd
+          r=json.load(open('MNQ_V42_FULL_2026/report.json'))
+          t=pd.read_csv('MNQ_V42_FULL_2026/trades.csv')
+          d=pd.read_csv('MNQ_V42_FULL_2026/days.csv')
+          print('=== REPORT ===')
+          print(json.dumps(r, indent=2))
+          if len(t):
+              print('=== FAMILY ===')
+              for k,g in t.groupby('family'):
+                  wins=(g.net_recovery>0).sum(); gp=g.loc[g.net_recovery>0,'net_recovery'].sum(); gl=-g.loc[g.net_recovery<0,'net_recovery'].sum()
+                  print(k, 'trades',len(g),'wins',wins,'wr',round(100*wins/len(g),2),'net',round(g.net_recovery.sum(),2),'pf',round(gp/gl,3) if gl else 'inf')
+              print('=== DIRECTION ===')
+              for k,g in t.groupby('direction'):
+                  wins=(g.net_recovery>0).sum(); gp=g.loc[g.net_recovery>0,'net_recovery'].sum(); gl=-g.loc[g.net_recovery<0,'net_recovery'].sum()
+                  print(k, 'trades',len(g),'wins',wins,'wr',round(100*wins/len(g),2),'net',round(g.net_recovery.sum(),2),'pf',round(gp/gl,3) if gl else 'inf')
+              print('=== TIER COUNTS ===')
+              print(t.groupby('tier').size().to_string())
+              print('=== BEST/WORST TRADES ===')
+              print(t.nlargest(5,'net_recovery')[['session_date','family','direction','tier','quantity','net_recovery','balance_after','cushion_after']].to_string(index=False))
+              print(t.nsmallest(5,'net_recovery')[['session_date','family','direction','tier','quantity','net_recovery','balance_after','cushion_after']].to_string(index=False))
+          if len(d):
+              print('=== DAY STATS ===')
+              print('days',len(d),'green',int((d.net>0).sum()),'red',int((d.net<0).sum()),'flat',int((d.net==0).sum()),'avg',round(d.net.mean(),2),'median',round(d.net.median(),2),'best',round(d.net.max(),2),'worst',round(d.net.min(),2))
+              print('min_cushion_eod',round(d.cushion_after_eod.min(),2))
+              for level in [48800,49200,49600,50000,51000,52000,53000]:
+                  hit=d[d.end_balance>=level]
+                  print('first_hit',level, hit.iloc[0].session_date if len(hit) else 'NEVER')
+          PY
+      - name: Upload result files
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnq-v42-full-backtest-results
+          path: |
+            MNQ_V42_FULL_2026/
+            v42_stdout.txt
